@@ -9,7 +9,7 @@ import time,datetime
 from tqdm import tqdm
 from multiprocessing import Pool as ThreadPool
 
-
+# onehot
 def one_hot_encoding(df,cols,is_drop=True):
     for col in cols:
         print('one hot encoding:',col)
@@ -19,6 +19,7 @@ def one_hot_encoding(df,cols,is_drop=True):
         df.drop(cols,axis=1,inplace=True)
     return df
 
+# 类别特征处理
 def cat_feature(df):
     one_hot_features = [col for col in df.columns if 'oneHot' in col]
     if lastk is None:
@@ -40,6 +41,7 @@ def cat_feature(df):
 
     return df
 
+# 数值特征处理
 def num_feature(df):
     if num_features[0][:5] == 'rank_':
         num_agg_df = df.groupby("customer_ID",sort=False)[num_features].agg(['last'])
@@ -51,7 +53,7 @@ def num_feature(df):
     num_agg_df.columns = ['_'.join(x) for x in num_agg_df.columns]
     if num_features[0][:5] != 'rank_':
         for col in num_agg_df.columns:
-            num_agg_df[col] = num_agg_df[col] // 0.01
+            num_agg_df[col] = num_agg_df[col] // 0.01 
     df = num_agg_df.reset_index()
     print('num feature shape after engineering', df.shape )
 
@@ -75,15 +77,20 @@ def diff_feature(df):
 
     return df
 
+
+###########################################################
+
 n_cpu = 16
 transform = [['','rank_','ym_rank_'],[''],['']]
 
-for li, lastk in enumerate([None,3,6]):
+for li, lastk in enumerate([None,3,6]): 
     for prefix in transform[li]:
         df = pd.read_feather(f'./input/train.feather').append(pd.read_feather(f'./input/test.feather')).reset_index(drop=True)
         all_cols = [c for c in list(df.columns) if c not in ['customer_ID','S_2']]
         cat_features = ["B_30","B_38","D_114","D_116","D_117","D_120","D_126","D_63","D_64","D_66","D_68"]
         num_features = [col for col in all_cols if col not in cat_features]
+
+        # S_、P_类特征填充缺失值
         for col in [col for col in df.columns if 'S_' in col or 'P_' in col]:
             if col != 'S_2':
                 df[col] = df[col].fillna(0)
@@ -91,6 +98,7 @@ for li, lastk in enumerate([None,3,6]):
         if lastk is not None:
             prefix = f'last{lastk}_' + prefix
             print('all df shape',df.shape)
+            # 计算特征分位数
             df['rank'] = df.groupby('customer_ID')['S_2'].rank(ascending=False)
             df = df.loc[df['rank']<=lastk].reset_index(drop=True)
             df = df.drop(['rank'],axis=1)
@@ -98,6 +106,7 @@ for li, lastk in enumerate([None,3,6]):
 
         if prefix == 'rank_':
             cids = df['customer_ID'].values
+            # 计算特征分位数
             df = df.groupby('customer_ID')[num_features].rank(pct=True).add_prefix('rank_')
             df.insert(0,'customer_ID',cids)
             num_features = [f'rank_{col}' for col in num_features]
@@ -105,6 +114,7 @@ for li, lastk in enumerate([None,3,6]):
         if prefix == 'ym_rank_':
             cids = df['customer_ID'].values
             df['ym'] = df['S_2'].apply(lambda x:x[:7])
+            # 计算特征分位数
             df = df.groupby('ym')[num_features].rank(pct=True).add_prefix('ym_rank_')
             num_features = [f'ym_rank_{col}' for col in num_features]
             df.insert(0,'customer_ID',cids)
@@ -112,6 +122,7 @@ for li, lastk in enumerate([None,3,6]):
         if prefix in ['','last3_']:
             df = one_hot_encoding(df,cat_features,False)
 
+        # 计数倒序的累计数
         vc = df['customer_ID'].value_counts(sort=False).cumsum()
         batch_size = int(np.ceil(len(vc) / n_cpu))
         dfs = []

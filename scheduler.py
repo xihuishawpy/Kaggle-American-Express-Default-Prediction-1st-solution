@@ -17,10 +17,7 @@ class SchedulerBase(object):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-        lr_list = []
-        for param_group in optimizer.param_groups:
-            lr_list += [param_group['lr']]
-        return lr_list
+        return [param_group['lr'] for param_group in optimizer.param_groups]
 
     def is_load_best_weight(self):
         return self._is_load_best_weight

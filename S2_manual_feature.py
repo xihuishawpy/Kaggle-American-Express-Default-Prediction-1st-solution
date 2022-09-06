@@ -13,7 +13,7 @@ from multiprocessing import Pool as ThreadPool
 def one_hot_encoding(df,cols,is_drop=True):
     for col in cols:
         print('one hot encoding:',col)
-        dummies = pd.get_dummies(pd.Series(df[col]),prefix='oneHot_%s'%col)
+        dummies = pd.get_dummies(pd.Series(df[col]), prefix=f'oneHot_{col}')
         df = pd.concat([df,dummies],axis=1)
     if is_drop:
         df.drop(cols,axis=1,inplace=True)
@@ -43,11 +43,10 @@ def cat_feature(df):
 def num_feature(df):
     if num_features[0][:5] == 'rank_':
         num_agg_df = df.groupby("customer_ID",sort=False)[num_features].agg(['last'])
+    elif lastk is None:
+        num_agg_df = df.groupby("customer_ID",sort=False)[num_features].agg(['mean', 'std', 'min', 'max', 'sum', 'last'])
     else:
-        if lastk is None:
-            num_agg_df = df.groupby("customer_ID",sort=False)[num_features].agg(['mean', 'std', 'min', 'max', 'sum', 'last'])
-        else:
-            num_agg_df = df.groupby("customer_ID",sort=False)[num_features].agg(['mean', 'std', 'min', 'max', 'sum'])
+        num_agg_df = df.groupby("customer_ID",sort=False)[num_features].agg(['mean', 'std', 'min', 'max', 'sum'])
     num_agg_df.columns = ['_'.join(x) for x in num_agg_df.columns]
     if num_features[0][:5] != 'rank_':
         for col in num_agg_df.columns:
@@ -80,7 +79,12 @@ transform = [['','rank_','ym_rank_'],[''],['']]
 
 for li, lastk in enumerate([None,3,6]):
     for prefix in transform[li]:
-        df = pd.read_feather(f'./input/train.feather').append(pd.read_feather(f'./input/test.feather')).reset_index(drop=True)
+        df = (
+            pd.read_feather('./input/train.feather')
+            .append(pd.read_feather('./input/test.feather'))
+            .reset_index(drop=True)
+        )
+
         all_cols = [c for c in list(df.columns) if c not in ['customer_ID','S_2']]
         cat_features = ["B_30","B_38","D_114","D_116","D_117","D_120","D_126","D_63","D_64","D_66","D_68"]
         num_features = [col for col in all_cols if col not in cat_features]
@@ -102,7 +106,7 @@ for li, lastk in enumerate([None,3,6]):
             df.insert(0,'customer_ID',cids)
             num_features = [f'rank_{col}' for col in num_features]
 
-        if prefix == 'ym_rank_':
+        elif prefix == 'ym_rank_':
             cids = df['customer_ID'].values
             df['ym'] = df['S_2'].apply(lambda x:x[:7])
             df = df.groupby('ym')[num_features].rank(pct=True).add_prefix('ym_rank_')

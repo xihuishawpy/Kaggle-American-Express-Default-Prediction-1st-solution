@@ -14,13 +14,13 @@ root = args.root
 seed = args.seed
 
 
-train = pd.read_feather(f'./input/train.feather')
-test = pd.read_feather(f'./input/test.feather')
+train = pd.read_feather('./input/train.feather')
+test = pd.read_feather('./input/test.feather')
 
 def one_hot_encoding(df,cols,is_drop=True):
     for col in cols:
         print('one hot encoding:',col)
-        dummies = pd.get_dummies(pd.Series(df[col]),prefix='oneHot_%s'%col)
+        dummies = pd.get_dummies(pd.Series(df[col]), prefix=f'oneHot_{col}')
         df = pd.concat([df,dummies],axis=1)
     if is_drop:
         df.drop(cols,axis=1,inplace=True)

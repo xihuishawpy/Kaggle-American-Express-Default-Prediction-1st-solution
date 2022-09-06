@@ -22,12 +22,15 @@ tmp2 = sub.groupby('customer_ID',sort=False)['prediction'].agg(lambda x:pad_targ
 
 tmp = tmp1.append(tmp2)
 
-tmp = pd.DataFrame(data=tmp.tolist(),columns=['target%s'%i for i in range(1,14)])
+tmp = pd.DataFrame(
+    data=tmp.tolist(), columns=[f'target{i}' for i in range(1, 14)]
+)
+
 
 
 df = []
 for fn in ['cat','num','diff','rank_num','last3_cat','last3_num','last3_diff', 'last6_num','ym_rank_num']:
-    if len(df) == 0:
+    if not df:
         df.append(pd.read_feather(f'{root}/{fn}_feature.feather'))
     else:
         df.append(pd.read_feather(f'{root}/{fn}_feature.feather').drop([id_name],axis=1))
@@ -45,7 +48,7 @@ del df
 def one_hot_encoding(df,cols,is_drop=True):
     for col in cols:
         print('one hot encoding:',col)
-        dummies = pd.get_dummies(pd.Series(df[col]),prefix='oneHot_%s'%col)
+        dummies = pd.get_dummies(pd.Series(df[col]), prefix=f'oneHot_{col}')
         df = pd.concat([df,dummies],axis=1)
     if is_drop:
         df.drop(cols,axis=1,inplace=True)
@@ -53,7 +56,12 @@ def one_hot_encoding(df,cols,is_drop=True):
 
 cat_features = ["B_30","B_38","D_114","D_116","D_117","D_120","D_126","D_63","D_64","D_66","D_68"]
 
-df = pd.read_feather(f'./input/train.feather').append(pd.read_feather(f'./input/test.feather')).reset_index(drop=True)
+df = (
+    pd.read_feather('./input/train.feather')
+    .append(pd.read_feather('./input/test.feather'))
+    .reset_index(drop=True)
+)
+
 df = df.drop(['S_2'],axis=1)
 df = one_hot_encoding(df,cat_features,True)
 for col in tqdm(df.columns):
@@ -73,12 +81,12 @@ def GreedyFindBin(distinct_values, counts,num_distinct_values, max_bin, total_cn
 #   min_data_in_bin 桶包含的最小样本数
 
 # bin_upper_bound就是记录桶分界的数组
-    bin_upper_bound=list();
+    bin_upper_bound = [];
     assert(max_bin>0)
 
+    cur_cnt_inbin = 0
     # 特征取值数比max_bin数量少，直接取distinct_values的中点放置
     if num_distinct_values <= max_bin:
-        cur_cnt_inbin = 0
         for i in range(num_distinct_values-1):
             cur_cnt_inbin += counts[i]
             #若一个特征的取值比min_data_in_bin小，则累积下一个取值，直到比min_data_in_bin大，进入循环。
@@ -88,8 +96,7 @@ def GreedyFindBin(distinct_values, counts,num_distinct_values, max_bin, total_cn
                 cur_cnt_inbin = 0
         # 对于最后一个桶的上界则为无穷大
         cur_cnt_inbin += counts[num_distinct_values - 1];
-        bin_upper_bound.append(float('Inf'))
-        # 特征取值数比max_bin来得大，说明几个特征值要共用一个bin
+            # 特征取值数比max_bin来得大，说明几个特征值要共用一个bin
     else:
         if min_data_in_bin>0:
             max_bin=min(max_bin,total_cnt//min_data_in_bin)
@@ -114,7 +121,6 @@ def GreedyFindBin(distinct_values, counts,num_distinct_values, max_bin, total_cn
 
         bin_cnt = 0
         lower_bounds[bin_cnt] = distinct_values[0]
-        cur_cnt_inbin = 0
         #重新遍历所有的特征值（包括数目大和数目小的）
         for i in range(num_distinct_values-1):
             #如果当前的特征值数目是小的
@@ -137,9 +143,12 @@ def GreedyFindBin(distinct_values, counts,num_distinct_values, max_bin, total_cn
                     mean_bin_size = rest_sample_cnt / rest_bin_cnt
 #             bin_cnt+=1
         # update bin upper bound 与特征取值数比max_bin数量少的操作类似，取当前值和下一个值的均值作为该桶的分界点
-        for i in range(bin_cnt-1):
-            bin_upper_bound.append((upper_bounds[i] + lower_bounds[i + 1]) / 2.0)
-        bin_upper_bound.append(float('Inf'))
+        bin_upper_bound.extend(
+            (upper_bounds[i] + lower_bounds[i + 1]) / 2.0
+            for i in range(bin_cnt - 1)
+        )
+
+    bin_upper_bound.append(float('Inf'))
     return bin_upper_bound
 
 cat_features = ["B_30","B_38","D_114","D_116","D_117","D_120","D_126","D_63","D_64","D_66","D_68"]
@@ -147,7 +156,7 @@ eps = 1e-3
 
 dfs = []
 for fn in ['cat','num','diff','rank_num','last3_cat','last3_num','last3_diff', 'last6_num','ym_rank_num']:
-    if len(dfs) == 0:
+    if not dfs:
         dfs.append(pd.read_feather(f'{root}/{fn}_feature.feather'))
     else:
         dfs.append(pd.read_feather(f'{root}/{fn}_feature.feather').drop(['customer_ID'],axis=1))

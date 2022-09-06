@@ -19,7 +19,7 @@ class Amodel(nn.Module):
                                         )
         self.gru_series = nn.GRU(hidden_dim, hidden_dim, batch_first=True, bidirectional=True)
         self.hidden_feature_block = []
-        for h in range(hidden_num-1):
+        for _ in range(hidden_num-1):
             self.hidden_feature_block.extend([
                                      nn.Linear(hidden_dim, hidden_dim)
                                      ,nn.BatchNorm1d(hidden_dim)
@@ -34,7 +34,7 @@ class Amodel(nn.Module):
 
                                          ,nn.Linear(1*hidden_dim, 1*hidden_dim)
                                          ,nn.LeakyReLU()
-                                         
+
                                          ,nn.Linear(1*hidden_dim, target_num)
                                          ,nn.Sigmoid()
                                          )
@@ -63,11 +63,9 @@ class Amodel(nn.Module):
         x1 = self.input_series_block(data['batch_series'])
 
         x1 = self.batch_gru(x1,data['batch_mask'])
-        if self.use_series_oof:
-            x2 = self.input_feature_block(data['batch_feature'])
-            x2 = self.hidden_feature_block(x2)
-            x = torch.cat([x1,x2],axis=1)
-            y = self.output_block(x)
-        else:
-            y = self.output_block(x1)
-        return y
+        if not self.use_series_oof:
+            return self.output_block(x1)
+        x2 = self.input_feature_block(data['batch_feature'])
+        x2 = self.hidden_feature_block(x2)
+        x = torch.cat([x1,x2],axis=1)
+        return self.output_block(x)
